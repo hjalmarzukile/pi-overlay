@@ -1,2 +1,277 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0d1117; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #080808;
+  --surface: #111;
+  --surface-hover: #161616;
+  --border: rgba(255,255,255,0.07);
+  --border-hover: rgba(255,255,255,0.12);
+  --text: #e8e8e8;
+  --text-secondary: #555;
+  --text-tertiary: #333;
+  --accent: #e8e8e8;
+  --approval: #d4a853;
+  --approval-bg: rgba(212,168,83,0.08);
+  --mono: "SF Mono", "Fira Code", monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { opacity: 0.7; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-template-rows: 52px 1fr;
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+
+.header-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.header-repo {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+}
+
+.header-spacer { flex: 1; }
+
+.badge-approval {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--approval);
+  background: var(--approval-bg);
+  border: 1px solid rgba(212,168,83,0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  letter-spacing: 0.03em;
+}
+
+/* Sidebar */
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 0;
+  transition: color 0.1s, background 0.1s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-item:hover { color: var(--text); background: var(--surface); }
+.nav-item.active { color: var(--text); }
+
+.nav-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+}
+
+.nav-section {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 16px 20px 6px;
+}
+
+/* Main */
+.main {
+  padding: 32px 40px;
+  overflow-y: auto;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.section-title.urgent { color: var(--approval); }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+  background: var(--surface-hover);
+}
+
+.btn-approve {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid rgba(212,168,83,0.3);
+  background: var(--approval-bg);
+  color: var(--approval);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.btn-approve:hover { background: rgba(212,168,83,0.14); }
+
+/* Cards */
+.card {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  transition: border-color 0.1s;
+}
+
+.card:hover { border-color: var(--border-hover); }
+.card.approval { border-color: rgba(212,168,83,0.25); background: var(--approval-bg); }
+
+.card-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-number {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  line-height: 1.4;
+}
+
+.card-title:hover { opacity: 0.75; }
+
+.card-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tag {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+}
+
+.tag-epic    { color: #6b9fd4; border-color: rgba(107,159,212,0.2); background: rgba(107,159,212,0.06); }
+.tag-task    { color: #a89060; border-color: rgba(168,144,96,0.2); background: rgba(168,144,96,0.06); }
+.tag-approve { color: #c96060; border-color: rgba(201,96,96,0.2); background: rgba(201,96,96,0.06); }
+.tag-self    { color: #608070; border-color: rgba(96,128,112,0.2); background: rgba(96,128,112,0.06); }
+.tag-waiting { color: var(--approval); border-color: rgba(212,168,83,0.2); background: rgba(212,168,83,0.06); }
+.tag-done    { color: #5a8a5a; border-color: rgba(90,138,90,0.2); background: rgba(90,138,90,0.06); }
+.tag-blocked { color: #8a4040; border-color: rgba(138,64,64,0.2); background: rgba(138,64,64,0.06); }
+.tag-default { color: var(--text-tertiary); border-color: var(--border); }
+
+/* Commits */
+.commit-list { border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.commit-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 100px;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  align-items: center;
+}
+.commit-row:last-child { border-bottom: none; }
+.commit-sha { font-family: var(--mono); color: var(--text-secondary); }
+.commit-sha:hover { color: var(--text); }
+.commit-msg { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.commit-author { color: var(--text-tertiary); text-align: right; font-size: 11px; }
+
+/* Empty */
+.empty {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  padding: 24px 0;
+}
+.empty a { color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; }
+
+.loading {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  padding: 40px;
+}
+
+.divider { height: 1px; background: var(--border); margin: 28px 0; }
