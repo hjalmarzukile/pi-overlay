@@ -275,3 +275,39 @@ a:hover { opacity: 0.7; }
 }
 
 .divider { height: 1px; background: var(--border); margin: 28px 0; }
+
+/* Commit summaries */
+.commit-block { border-bottom: 1px solid var(--border); }
+.commit-block:last-child { border-bottom: none; }
+.commit-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 90px 20px;
+  gap: 16px;
+  padding: 10px 16px;
+  font-size: 12px;
+  align-items: center;
+  border-bottom: none;
+}
+
+.summary-dot { font-size: 10px; }
+.has-summary { color: #5a8a5a; }
+.no-summary  { color: var(--text-tertiary); }
+
+.summary-body {
+  padding: 10px 16px 14px 88px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  border-top: 1px solid var(--border);
+  background: var(--surface-hover);
+}
+
+.summary-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.summary-link:hover { color: var(--text-secondary); }

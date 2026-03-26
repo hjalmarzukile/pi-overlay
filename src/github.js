@@ -28,3 +28,9 @@ export async function addLabel(repo, issueNumber, label) {
   });
   return res.ok;
 }
+
+export async function getRepoCommitComments(repo) {
+  const res = await fetch(`${BASE}/repos/${repo}/comments?per_page=100`, { headers });
+  if (!res.ok) return [];
+  return res.json();
+}

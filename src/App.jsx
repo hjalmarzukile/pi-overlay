@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { getIssues, addLabel, getCommits } from "./github";
+import { getIssues, addLabel, getCommits, getRepoCommitComments } from "./github";
 import "./App.css";
 
 const PROJECT_REPO = "hjalmarzukile/AInterview_litreview";
 const TASK_BOARD_REPO = "hjalmarzukile/task-board";
 const GH = "https://github.com";
 
-const NEW_EPIC = `${GH}/${PROJECT_REPO}/issues/new?template=epic.yml`;
-const NEW_TASK = `${GH}/${PROJECT_REPO}/issues/new?template=task.yml`;
+const NEW_EPIC      = `${GH}/${PROJECT_REPO}/issues/new?template=epic.yml`;
+const NEW_TASK      = `${GH}/${PROJECT_REPO}/issues/new?template=task.yml`;
 const NEW_BOARD_TASK = `${GH}/${TASK_BOARD_REPO}/issues/new`;
 
 function tag(name) {
@@ -18,6 +18,15 @@ function tag(name) {
     blocked: "tag-blocked",
   };
   return `tag ${map[name] || "tag-default"}`;
+}
+
+function parseSummary(comments, sha) {
+  const c = comments.find(
+    (c) => c.commit_id === sha && c.body.includes("<!-- commit-summary -->")
+  );
+  if (!c) return null;
+  const text = c.body.replace("<!-- commit-summary -->", "").replace("**Summary:**", "").trim();
+  return { text, url: c.html_url, id: c.id };
 }
 
 function IssueCard({ issue, onApprove }) {
@@ -49,18 +58,42 @@ function IssueCard({ issue, onApprove }) {
   );
 }
 
-function CommitFeed({ commits }) {
+function CommitRow({ commit, summary }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="commit-block">
+      <div className="commit-row" onClick={() => summary && setExpanded((e) => !e)}
+        style={{ cursor: summary ? "pointer" : "default" }}>
+        <a href={commit.html_url} target="_blank" rel="noreferrer"
+          className="commit-sha" onClick={(e) => e.stopPropagation()}>
+          {commit.sha.slice(0, 7)}
+        </a>
+        <span className="commit-msg">{commit.commit.message.split("\n")[0]}</span>
+        <span className="commit-author">{commit.commit.author.name}</span>
+        <span className="commit-summary-indicator">
+          {summary
+            ? <span className="summary-dot has-summary" title="Has summary">●</span>
+            : <span className="summary-dot no-summary" title="No summary yet">○</span>}
+        </span>
+      </div>
+      {expanded && summary && (
+        <div className="summary-body">
+          <p>{summary.text}</p>
+          <a href={summary.url} target="_blank" rel="noreferrer" className="summary-link">
+            View on GitHub →
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommitFeed({ commits, comments }) {
   if (!commits.length) return <p className="empty">No commits yet.</p>;
   return (
     <div className="commit-list">
-      {commits.slice(0, 10).map((c) => (
-        <div key={c.sha} className="commit-row">
-          <a href={c.html_url} target="_blank" rel="noreferrer" className="commit-sha">
-            {c.sha.slice(0, 7)}
-          </a>
-          <span className="commit-msg">{c.commit.message.split("\n")[0]}</span>
-          <span className="commit-author">{c.commit.author.name}</span>
-        </div>
+      {commits.slice(0, 15).map((c) => (
+        <CommitRow key={c.sha} commit={c} summary={parseSummary(comments, c.sha)} />
       ))}
     </div>
   );
@@ -71,18 +104,21 @@ export default function App() {
   const [issues, setIssues] = useState([]);
   const [boardIssues, setBoardIssues] = useState([]);
   const [commits, setCommits] = useState([]);
+  const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
-    const [iss, board, cms] = await Promise.all([
+    const [iss, board, cms, coms] = await Promise.all([
       getIssues(PROJECT_REPO),
       getIssues(TASK_BOARD_REPO),
-      getCommits(PROJECT_REPO),
+      getCommits(PROJECT_REPO, 15),
+      getRepoCommitComments(PROJECT_REPO),
     ]);
     setIssues(iss);
     setBoardIssues(board);
     setCommits(cms);
+    setComments(coms);
     setLoading(false);
   };
 
@@ -93,17 +129,19 @@ export default function App() {
     await load();
   };
 
-  const epics = issues.filter((i) => i.labels.some((l) => l.name === "epic"));
-  const tasks = issues.filter((i) => i.labels.some((l) => l.name === "task"));
-  const pending = issues.filter((i) => i.labels.some((l) => l.name === "awaiting-pi-approval"));
+  const epics    = issues.filter((i) => i.labels.some((l) => l.name === "epic"));
+  const tasks    = issues.filter((i) => i.labels.some((l) => l.name === "task"));
+  const pending  = issues.filter((i) => i.labels.some((l) => l.name === "awaiting-pi-approval"));
   const available = boardIssues.filter((i) => i.labels.some((l) => l.name === "available"));
+
+  const summarised = commits.filter((c) => parseSummary(comments, c.sha)).length;
 
   const nav = [
     { id: "overview", label: "Overview" },
     { id: "epics",    label: "Epics",   count: epics.length },
     { id: "tasks",    label: "Tasks",   count: tasks.length },
     { id: "board",    label: "Board",   count: available.length },
-    { id: "commits",  label: "Commits" },
+    { id: "commits",  label: "Commits", count: commits.length ? `${summarised}/${commits.length}` : null },
   ];
 
   return (
@@ -127,7 +165,6 @@ export default function App() {
             {n.count != null && <span className="nav-count">{n.count}</span>}
           </button>
         ))}
-
         <span className="nav-section" style={{ marginTop: 24 }}>Create</span>
         <a href={NEW_EPIC} target="_blank" rel="noreferrer" className="nav-item">New epic</a>
         <a href={NEW_TASK} target="_blank" rel="noreferrer" className="nav-item">New task</a>
@@ -148,7 +185,6 @@ export default function App() {
                 <div className="divider" />
               </section>
             )}
-
             <section style={{ marginBottom: 32 }}>
               <div className="section-header">
                 <span className="section-title">Open epics</span>
@@ -158,12 +194,14 @@ export default function App() {
                 ? <p className="empty">No open epics.</p>
                 : epics.map((i) => <IssueCard key={i.id} issue={i} onApprove={handleApprove} />)}
             </section>
-
             <section>
               <div className="section-header">
                 <span className="section-title">Recent commits</span>
+                <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                  click a summarised commit to expand
+                </span>
               </div>
-              <CommitFeed commits={commits} />
+              <CommitFeed commits={commits.slice(0, 5)} comments={comments} />
             </section>
           </>
         )}
@@ -199,7 +237,7 @@ export default function App() {
               <a href={NEW_BOARD_TASK} target="_blank" rel="noreferrer" className="btn">+ Post task</a>
             </div>
             <p style={{ color: "var(--text-tertiary)", fontSize: 12, marginBottom: 20 }}>
-              Students claim tasks by commenting <code style={{ color: "var(--text-secondary)" }}>/claim</code> on any issue below.
+              Students claim tasks by commenting <code style={{ color: "var(--text-secondary)" }}>/claim</code> on any issue.
             </p>
             {available.length === 0
               ? <p className="empty">No available tasks on the board.</p>
@@ -221,8 +259,11 @@ export default function App() {
           <>
             <div className="section-header">
               <span className="section-title">Commits</span>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                {summarised}/{commits.length} summarised — click to expand
+              </span>
             </div>
-            <CommitFeed commits={commits} />
+            <CommitFeed commits={commits} comments={comments} />
           </>
         )}
       </main>
