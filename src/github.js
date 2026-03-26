@@ -34,3 +34,26 @@ export async function getRepoCommitComments(repo) {
   if (!res.ok) return [];
   return res.json();
 }
+
+export async function getIssueComments(repo, number) {
+  const res = await fetch(`${BASE}/repos/${repo}/issues/${number}/comments?per_page=100`, { headers });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function postIssueComment(repo, number, body) {
+  const res = await fetch(`${BASE}/repos/${repo}/issues/${number}/comments`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  return res.ok;
+}
+
+export async function getSubIssues(repo, number) {
+  const res = await fetch(`${BASE}/repos/${repo}/issues/${number}/sub_issues?per_page=50`, {
+    headers: { ...headers, Accept: "application/vnd.github+json" }
+  });
+  if (!res.ok) return [];
+  return res.json();
+}

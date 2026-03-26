@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
-import { getIssues, addLabel, getCommits, getRepoCommitComments } from "./github";
+import { useState, useEffect, useRef } from "react";
+import { getIssues, addLabel, getCommits, getRepoCommitComments,
+         getIssueComments, postIssueComment, getSubIssues } from "./github";
 import "./App.css";
 
-const PROJECT_REPO = "hjalmarzukile/AInterview_litreview";
+const PROJECT_REPO   = "hjalmarzukile/AInterview_litreview";
 const TASK_BOARD_REPO = "hjalmarzukile/task-board";
 const GH = "https://github.com";
 
-const NEW_EPIC      = `${GH}/${PROJECT_REPO}/issues/new?template=epic.yml`;
-const NEW_TASK      = `${GH}/${PROJECT_REPO}/issues/new?template=task.yml`;
+const NEW_EPIC       = `${GH}/${PROJECT_REPO}/issues/new?template=epic.yml`;
+const NEW_TASK       = `${GH}/${PROJECT_REPO}/issues/new?template=task.yml`;
 const NEW_BOARD_TASK = `${GH}/${TASK_BOARD_REPO}/issues/new`;
 
 function tag(name) {
@@ -26,34 +27,149 @@ function parseSummary(comments, sha) {
   );
   if (!c) return null;
   const text = c.body.replace("<!-- commit-summary -->", "").replace("**Summary:**", "").trim();
-  return { text, url: c.html_url, id: c.id };
+  return { text, url: c.html_url };
 }
 
-function IssueCard({ issue, onApprove }) {
+function timeAgo(dateStr) {
+  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function CommentThread({ repo, issue, onApprove }) {
+  const [comments, setComments]   = useState(null);
+  const [subIssues, setSubIssues] = useState(null);
+  const [draft, setDraft]         = useState("");
+  const [posting, setPosting]     = useState(false);
+  const textareaRef = useRef();
+
+  useEffect(() => {
+    getIssueComments(repo, issue.number).then(setComments);
+    getSubIssues(repo, issue.number).then(setSubIssues);
+  }, [repo, issue.number]);
+
+  const handlePost = async () => {
+    if (!draft.trim()) return;
+    setPosting(true);
+    const ok = await postIssueComment(repo, issue.number, draft.trim());
+    if (ok) {
+      setDraft("");
+      const updated = await getIssueComments(repo, issue.number);
+      setComments(updated);
+    }
+    setPosting(false);
+  };
+
   const needsApproval = issue.labels.some((l) => l.name === "awaiting-pi-approval");
+
   return (
-    <div className={`card ${needsApproval ? "approval" : ""}`}>
-      <div className="card-row">
+    <div className="thread">
+      {/* Issue body */}
+      {issue.body && (
+        <div className="thread-body">
+          <p>{issue.body.slice(0, 400)}{issue.body.length > 400 ? "…" : ""}</p>
+        </div>
+      )}
+
+      {/* Sub-issues */}
+      {subIssues && subIssues.length > 0 && (
+        <div className="sub-issues">
+          <span className="thread-label">Sub-issues</span>
+          {subIssues.map((s) => (
+            <div key={s.number} className="sub-issue-row">
+              <span className={`sub-dot ${s.state === "closed" ? "closed" : "open"}`}>●</span>
+              <a href={s.html_url} target="_blank" rel="noreferrer" className="sub-title">
+                #{s.number} {s.title}
+              </a>
+              {s.assignee && (
+                <img src={s.assignee.avatar_url} alt={s.assignee.login}
+                  title={`@${s.assignee.login}`} className="card-avatar" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Comments */}
+      <div className="comments">
+        {comments === null && <p className="thread-loading">Loading…</p>}
+        {comments && comments.length === 0 && (
+          <p className="thread-empty">No comments yet.</p>
+        )}
+        {comments && comments.map((c) => (
+          <div key={c.id} className="comment">
+            <div className="comment-header">
+              <img src={c.user.avatar_url} alt={c.user.login} className="card-avatar" />
+              <span className="comment-author">@{c.user.login}</span>
+              <span className="comment-time">{timeAgo(c.created_at)}</span>
+              <a href={c.html_url} target="_blank" rel="noreferrer" className="comment-link">↗</a>
+            </div>
+            <div className="comment-body">{c.body}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Reply box */}
+      <div className="reply-box">
+        <textarea
+          ref={textareaRef}
+          className="reply-input"
+          placeholder="Leave a comment…"
+          value={draft}
+          rows={2}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handlePost(); }}
+        />
+        <div className="reply-actions">
+          <span className="reply-hint">⌘↵ to post</span>
+          {needsApproval && (
+            <button className="btn-approve" onClick={() => onApprove(issue.number)}>
+              Approve &amp; close
+            </button>
+          )}
+          <button className="btn" onClick={handlePost} disabled={posting || !draft.trim()}>
+            {posting ? "Posting…" : "Post"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IssueCard({ issue, repo, onApprove }) {
+  const [expanded, setExpanded] = useState(false);
+  const needsApproval = issue.labels.some((l) => l.name === "awaiting-pi-approval");
+  const commentCount  = issue.comments;
+
+  return (
+    <div className={`card ${needsApproval ? "approval" : ""} ${expanded ? "expanded" : ""}`}>
+      <div className="card-row" onClick={() => setExpanded((e) => !e)} style={{ cursor: "pointer" }}>
         <span className="card-number">#{issue.number}</span>
-        <a href={issue.html_url} target="_blank" rel="noreferrer" className="card-title">
+        <a href={issue.html_url} target="_blank" rel="noreferrer"
+          className="card-title" onClick={(e) => e.stopPropagation()}>
           {issue.title}
         </a>
-        {issue.assignee && (
-          <img className="card-avatar" src={issue.assignee.avatar_url}
-            alt={issue.assignee.login} title={`@${issue.assignee.login}`} />
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {commentCount > 0 && (
+            <span className="comment-count">{commentCount}</span>
+          )}
+          {issue.assignee && (
+            <img className="card-avatar" src={issue.assignee.avatar_url}
+              alt={issue.assignee.login} title={`@${issue.assignee.login}`} />
+          )}
+          <span className="expand-chevron">{expanded ? "▾" : "▸"}</span>
+        </div>
       </div>
       <div className="card-meta">
         {issue.labels.map((l) => (
           <span key={l.name} className={tag(l.name)}>{l.name}</span>
         ))}
-        {needsApproval && (
-          <button className="btn-approve" style={{ marginLeft: "auto" }}
-            onClick={() => onApprove(issue.number)}>
-            Approve &amp; close
-          </button>
-        )}
       </div>
+      {expanded && (
+        <CommentThread repo={repo} issue={issue} onApprove={onApprove} />
+      )}
     </div>
   );
 }
@@ -73,7 +189,7 @@ function CommitRow({ commit, summary }) {
         <span className="commit-summary-indicator">
           {summary
             ? <span className="summary-dot has-summary" title="Has summary">●</span>
-            : <span className="summary-dot no-summary" title="No summary yet">○</span>}
+            : <span className="summary-dot no-summary" title="No summary">○</span>}
         </span>
       </div>
       {expanded && summary && (
@@ -92,7 +208,7 @@ function CommitFeed({ commits, comments }) {
   if (!commits.length) return <p className="empty">No commits yet.</p>;
   return (
     <div className="commit-list">
-      {commits.slice(0, 15).map((c) => (
+      {commits.map((c) => (
         <CommitRow key={c.sha} commit={c} summary={parseSummary(comments, c.sha)} />
       ))}
     </div>
@@ -100,12 +216,12 @@ function CommitFeed({ commits, comments }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState("overview");
-  const [issues, setIssues] = useState([]);
+  const [tab, setTab]             = useState("overview");
+  const [issues, setIssues]       = useState([]);
   const [boardIssues, setBoardIssues] = useState([]);
-  const [commits, setCommits] = useState([]);
-  const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [commits, setCommits]     = useState([]);
+  const [comments, setComments]   = useState([]);
+  const [loading, setLoading]     = useState(true);
 
   const load = async () => {
     setLoading(true);
@@ -129,11 +245,10 @@ export default function App() {
     await load();
   };
 
-  const epics    = issues.filter((i) => i.labels.some((l) => l.name === "epic"));
-  const tasks    = issues.filter((i) => i.labels.some((l) => l.name === "task"));
-  const pending  = issues.filter((i) => i.labels.some((l) => l.name === "awaiting-pi-approval"));
+  const epics     = issues.filter((i) => i.labels.some((l) => l.name === "epic"));
+  const tasks     = issues.filter((i) => i.labels.some((l) => l.name === "task"));
+  const pending   = issues.filter((i) => i.labels.some((l) => l.name === "awaiting-pi-approval"));
   const available = boardIssues.filter((i) => i.labels.some((l) => l.name === "available"));
-
   const summarised = commits.filter((c) => parseSummary(comments, c.sha)).length;
 
   const nav = [
@@ -181,7 +296,7 @@ export default function App() {
                 <div className="section-header">
                   <span className="section-title urgent">Awaiting approval</span>
                 </div>
-                {pending.map((i) => <IssueCard key={i.id} issue={i} onApprove={handleApprove} />)}
+                {pending.map((i) => <IssueCard key={i.id} issue={i} repo={PROJECT_REPO} onApprove={handleApprove} />)}
                 <div className="divider" />
               </section>
             )}
@@ -192,14 +307,11 @@ export default function App() {
               </div>
               {epics.length === 0
                 ? <p className="empty">No open epics.</p>
-                : epics.map((i) => <IssueCard key={i.id} issue={i} onApprove={handleApprove} />)}
+                : epics.map((i) => <IssueCard key={i.id} issue={i} repo={PROJECT_REPO} onApprove={handleApprove} />)}
             </section>
             <section>
               <div className="section-header">
                 <span className="section-title">Recent commits</span>
-                <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                  click a summarised commit to expand
-                </span>
               </div>
               <CommitFeed commits={commits.slice(0, 5)} comments={comments} />
             </section>
@@ -214,7 +326,7 @@ export default function App() {
             </div>
             {epics.length === 0
               ? <p className="empty">No open epics.</p>
-              : epics.map((i) => <IssueCard key={i.id} issue={i} onApprove={handleApprove} />)}
+              : epics.map((i) => <IssueCard key={i.id} issue={i} repo={PROJECT_REPO} onApprove={handleApprove} />)}
           </>
         )}
 
@@ -226,7 +338,7 @@ export default function App() {
             </div>
             {tasks.length === 0
               ? <p className="empty">No open tasks.</p>
-              : tasks.map((i) => <IssueCard key={i.id} issue={i} onApprove={handleApprove} />)}
+              : tasks.map((i) => <IssueCard key={i.id} issue={i} repo={PROJECT_REPO} onApprove={handleApprove} />)}
           </>
         )}
 
@@ -240,17 +352,9 @@ export default function App() {
               Students claim tasks by commenting <code style={{ color: "var(--text-secondary)" }}>/claim</code> on any issue.
             </p>
             {available.length === 0
-              ? <p className="empty">No available tasks on the board.</p>
+              ? <p className="empty">No available tasks.</p>
               : available.map((i) => (
-                  <div key={i.id} className="card">
-                    <div className="card-row">
-                      <span className="card-number">#{i.number}</span>
-                      <a href={i.html_url} target="_blank" rel="noreferrer" className="card-title">{i.title}</a>
-                    </div>
-                    <div className="card-meta">
-                      {i.labels.map((l) => <span key={l.name} className={tag(l.name)}>{l.name}</span>)}
-                    </div>
-                  </div>
+                  <IssueCard key={i.id} issue={i} repo={TASK_BOARD_REPO} onApprove={() => {}} />
                 ))}
           </>
         )}
@@ -260,7 +364,7 @@ export default function App() {
             <div className="section-header">
               <span className="section-title">Commits</span>
               <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                {summarised}/{commits.length} summarised — click to expand
+                {summarised}/{commits.length} summarised · click to expand
               </span>
             </div>
             <CommitFeed commits={commits} comments={comments} />
