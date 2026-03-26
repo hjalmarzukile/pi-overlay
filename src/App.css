@@ -177,7 +177,7 @@ a:hover { opacity: 0.7; }
 .card {
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 14px 16px;
+  padding: 0;
   margin-bottom: 8px;
   background: var(--surface);
   transition: border-color 0.1s;
@@ -327,9 +327,9 @@ a:hover { opacity: 0.7; }
 
 /* Thread container */
 .thread {
-  margin-top: 12px;
+  margin-top: 0;
   border-top: 1px solid var(--border);
-  padding-top: 14px;
+  padding: 14px 16px;
 }
 
 .thread-label {
@@ -446,8 +446,7 @@ a:hover { opacity: 0.7; }
 .card-clickable {
   cursor: pointer;
   padding: 14px 16px;
-  margin: -14px -16px;
-  border-radius: 6px;
+  border-radius: 7px 7px 0 0;
 }
 .card-clickable:hover { background: var(--surface-hover); }
 
